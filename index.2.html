@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Academic Management System</title>
+
+<!-- Tailwind -->
+<script src="https://cdn.tailwindcss.com"></script>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body{
+  transition: background 0.3s,color 0.3s;
+}
+.hidden{display:none;}
+.card{
+  background:rgba(255,255,255,0.08);
+  backdrop-filter:blur(14px);
+  border-radius:16px;
+  padding:20px;
+}
+</style>
+</head>
+
+<body class="bg-slate-900 text-white min-h-screen">
+
+<!-- ================= AUTH ================= -->
+<div id="authSection" class="flex items-center justify-center min-h-screen">
+  <div class="card w-full max-w-md">
+    <h2 class="text-2xl font-bold mb-4 text-center">Student Login</h2>
+    <input id="username" placeholder="Username" class="w-full mb-3 p-2 rounded bg-slate-800">
+    <input id="password" type="password" placeholder="Password" class="w-full mb-3 p-2 rounded bg-slate-800">
+    <button onclick="login()" class="w-full bg-green-400 text-black font-bold py-2 rounded">
+      Login
+    </button>
+  </div>
+</div>
+
+<!-- ================= DASHBOARD ================= -->
+<div id="dashboard" class="hidden p-6">
+
+<header class="flex justify-between items-center mb-6">
+  <h1 class="text-3xl font-extrabold">
+    Smart Academic System
+  </h1>
+  <button onclick="logout()" class="bg-red-500 px-4 py-2 rounded">
+    Logout
+  </button>
+</header>
+
+<!-- Stats -->
+<div class="grid md:grid-cols-3 gap-4 mb-6">
+  <div class="card">
+    <h3>Total Subjects</h3>
+    <p id="totalSubjects" class="text-3xl font-bold">0</p>
+  </div>
+  <div class="card">
+    <h3>Average Attendance</h3>
+    <p id="avgAttendance" class="text-3xl font-bold">0%</p>
+  </div>
+  <div class="card">
+    <h3>Risk Status</h3>
+    <p id="riskStatus" class="text-2xl font-bold text-green-400">Safe</p>
+  </div>
+</div>
+
+<!-- Attendance Entry -->
+<div class="card mb-6">
+  <h2 class="text-xl font-bold mb-4">Add Attendance</h2>
+
+  <div class="grid md:grid-cols-4 gap-3">
+    <input id="subject" placeholder="Subject Name" class="p-2 rounded bg-slate-800">
+    <input id="attended" type="number" placeholder="Attended" class="p-2 rounded bg-slate-800">
+    <input id="total" type="number" placeholder="Total Lectures" class="p-2 rounded bg-slate-800">
+    <button onclick="addAttendance()" class="bg-green-400 text-black font-bold rounded">
+      Add
+    </button>
+  </div>
+</div>
+
+<!-- Attendance Table -->
+<div class="card mb-6">
+  <h2 class="text-xl font-bold mb-4">Attendance Records</h2>
+  <table class="w-full text-left">
+    <thead>
+      <tr class="text-slate-400">
+        <th>Subject</th>
+        <th>Attended</th>
+        <th>Total</th>
+        <th>%</th>
+      </tr>
+    </thead>
+    <tbody id="attendanceTable"></tbody>
+  </table>
+</div>
+
+<!-- Chart -->
+<div class="card">
+  <h2 class="text-xl font-bold mb-4">Attendance Analytics</h2>
+  <canvas id="attendanceChart"></canvas>
+</div>
+
+</div>
+
+<script>
+let user=null;
+let attendance=JSON.parse(localStorage.getItem("attendance"))||[];
+let chart=null;
+
+/* LOGIN */
+function login(){
+  const u=document.getElementById("username").value;
+  const p=document.getElementById("password").value;
+  if(u && p){
+    user=u;
+    document.getElementById("authSection").classList.add("hidden");
+    document.getElementById("dashboard").classList.remove("hidden");
+    render();
+  }
+}
+
+/* LOGOUT */
+function logout(){
+  location.reload();
+}
+
+/* ADD ATTENDANCE */
+function addAttendance(){
+  const subject=document.getElementById("subject").value;
+  const attended=parseInt(document.getElementById("attended").value);
+  const total=parseInt(document.getElementById("total").value);
+
+  if(!subject||!attended||!total)return;
+
+  attendance.push({subject,attended,total});
+  localStorage.setItem("attendance",JSON.stringify(attendance));
+  render();
+}
+
+/* RENDER */
+function render(){
+  const table=document.getElementById("attendanceTable");
+  table.innerHTML="";
+
+  let sum=0;
+  attendance.forEach(a=>{
+    const pct=Math.round((a.attended/a.total)*100);
+    sum+=pct;
+    table.innerHTML+=`
+      <tr>
+        <td>${a.subject}</td>
+        <td>${a.attended}</td>
+        <td>${a.total}</td>
+        <td>${pct}%</td>
+      </tr>
+    `;
+  });
+
+  document.getElementById("totalSubjects").innerText=attendance.length;
+  const avg=attendance.length?Math.round(sum/attendance.length):0;
+  document.getElementById("avgAttendance").innerText=avg+"%";
+
+  document.getElementById("riskStatus").innerText=
+    avg<75?"At Risk":"Safe";
+  document.getElementById("riskStatus").className=
+    avg<75?"text-red-500 font-bold":"text-green-400 font-bold";
+
+  drawChart();
+}
+
+/* CHART */
+function drawChart(){
+  const ctx=document.getElementById("attendanceChart");
+  const labels=attendance.map(a=>a.subject);
+  const data=attendance.map(a=>Math.round((a.attended/a.total)*100));
+
+  if(chart) chart.destroy();
+
+  chart=new Chart(ctx,{
+    type:"bar",
+    data:{
+      labels,
+      datasets:[{
+        label:"Attendance %",
+        data,
+        backgroundColor:"#4ade80"
+      }]
+    }
+  });
+}
+</script>
+
+</body>
+</html>

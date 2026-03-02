@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trackit Pro+</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap');
+
+:root{
+--primary:#4D6BFE;
+--accent:#C1FF72;
+--bg-dark:#0f172a;
+--bg-light:#f8fafc;
+}
+
+body{
+font-family:'Plus Jakarta Sans',sans-serif;
+background:var(--bg-dark);
+color:white;
+transition:.4s ease;
+}
+
+body.light-mode{
+background:var(--bg-light);
+color:#0f172a;
+}
+
+body.focus-mode .glass-card{
+opacity:.3;
+}
+
+body.focus-mode .task-item{
+opacity:.2;
+}
+
+body.focus-mode .task-item.focus-active{
+opacity:1;
+transform:scale(1.03);
+border:1px solid var(--accent);
+}
+
+.glass-card{
+background:rgba(255,255,255,.05);
+backdrop-filter:blur(16px);
+border:1px solid rgba(255,255,255,.08);
+box-shadow:0 8px 32px rgba(0,0,0,.3);
+transition:.3s;
+}
+
+.task-item{
+transition:.3s cubic-bezier(.175,.885,.32,1.275);
+}
+.task-item:hover{
+transform:translateY(-2px);
+}
+
+.progress-ring{
+transform:rotate(-90deg);
+transform-origin:50% 50%;
+transition:stroke-dashoffset .35s;
+}
+
+.filter-btn{
+padding:6px 14px;
+border-radius:999px;
+background:rgba(255,255,255,.05);
+font-size:12px;
+display:flex;
+gap:6px;
+align-items:center;
+}
+
+.filter-btn.active{
+background:var(--accent);
+color:black;
+font-weight:bold;
+}
+
+.top-buttons{
+position:absolute;
+right:30px;
+top:25px;
+display:flex;
+gap:10px;
+}
+</style>
+</head>
+
+<body class="p-6">
+
+<h1 class="text-3xl font-extrabold mb-6">
+TRACK<span class="text-[#C1FF72]">IT</span>
+</h1>
+
+<!-- THEME + FOCUS -->
+<div class="top-buttons">
+<button onclick="toggleTheme()" class="glass-card p-2 rounded-full">
+<i data-lucide="moon" id="themeIcon" class="w-5 h-5"></i>
+</button>
+
+<button onclick="toggleFocusMode()" class="glass-card p-2 rounded-full">
+<i data-lucide="target" class="w-5 h-5 text-[#C1FF72]"></i>
+</button>
+</div>
+
+<!-- ADD TASK -->
+<div class="glass-card p-4 rounded-xl flex gap-3 mb-4">
+<input id="taskInput" placeholder="Enter your next mission..."
+class="bg-transparent w-full outline-none"/>
+
+<input type="date" id="dueInput" class="bg-transparent text-sm"/>
+
+<select id="prioritySelect" class="bg-transparent text-sm">
+<option value="high">🔴</option>
+<option value="medium" selected>🟡</option>
+<option value="low">🔵</option>
+</select>
+
+<button onclick="addTask()" class="bg-[#C1FF72] text-black px-6 rounded-xl font-bold">
+ADD
+</button>
+</div>
+
+<!-- QUICK FILTERS -->
+<div class="flex gap-3 mb-6 flex-wrap">
+<button onclick="setFilter('all')" class="filter-btn active">
+📦 All
+</button>
+
+<button onclick="setFilter('today')" class="filter-btn">
+📅 Today
+</button>
+
+<button onclick="setFilter('upcoming')" class="filter-btn">
+⏳ Upcoming
+</button>
+
+<button onclick="setFilter('focus')" class="filter-btn">
+🧠 Focus
+</button>
+</div>
+
+<!-- ACTIVE TASKS -->
+<div id="taskList" class="space-y-3 mb-10"></div>
+
+<!-- PRODUCTIVITY + HEATMAP -->
+<div class="grid md:grid-cols-2 gap-8 mb-12">
+
+<div class="glass-card rounded-3xl p-6 text-center">
+<h3 class="text-sm font-semibold mb-4">PRODUCTIVITY</h3>
+
+<div class="flex justify-center mb-4">
+<svg width="120" height="120">
+<circle cx="60" cy="60" r="50"
+stroke="#1e293b"
+stroke-width="8"
+fill="transparent"/>
+
+<circle id="progressCircle"
+cx="60" cy="60" r="50"
+stroke="url(#gradient)"
+stroke-width="8"
+fill="transparent"
+stroke-dasharray="314.159"
+stroke-dashoffset="314.159"
+class="progress-ring"/>
+
+<defs>
+<linearGradient id="gradient">
+<stop offset="0%" stop-color="#4D6BFE"/>
+<stop offset="100%" stop-color="#C1FF72"/>
+</linearGradient>
+</defs>
+</svg>
+</div>
+
+<p id="statsLabel" class="text-xs text-slate-400">
+0 of 0 missions complete
+</p>
+</div>
+
+<div class="glass-card rounded-3xl p-6">
+<h3 class="text-sm font-semibold mb-4">
+DAILY HEATMAP
+</h3>
+<div id="heatmap" class="grid grid-cols-7 gap-1"></div>
+</div>
+
+</div>
+
+<!-- HISTORY SECTION -->
+<div>
+<h2 class="text-xs uppercase tracking-widest text-slate-400 mb-4">
+Task History
+</h2>
+<div id="historyList" class="space-y-3"></div>
+</div>
+
+<script>
+lucide.createIcons();
+
+let tasks=JSON.parse(localStorage.getItem("trackit_tasks"))||[];
+let currentFilter="all";
+let isFocus=false;
+
+const taskList=document.getElementById("taskList");
+const historyList=document.getElementById("historyList");
+const progressCircle=document.getElementById("progressCircle");
+const statsLabel=document.getElementById("statsLabel");
+const heatmap=document.getElementById("heatmap");
+const themeIcon=document.getElementById("themeIcon");
+
+/* THEME */
+function toggleTheme(){
+document.body.classList.toggle("light-mode");
+themeIcon.setAttribute("data-lucide",
+document.body.classList.contains("light-mode")?"sun":"moon");
+lucide.createIcons();
+}
+
+/* FOCUS */
+function toggleFocusMode(){
+isFocus=!isFocus;
+document.body.classList.toggle("focus-mode");
+highlightCurrentTask();
+}
+
+function highlightCurrentTask(){
+document.querySelectorAll(".task-item")
+.forEach(t=>t.classList.remove("focus-active"));
+if(isFocus){
+const first=document.querySelector(".task-item");
+if(first) first.classList.add("focus-active");
+}
+}
+
+/* ADD TASK */
+function addTask(){
+const input=document.getElementById("taskInput");
+const due=document.getElementById("dueInput").value;
+const priority=document.getElementById("prioritySelect").value;
+
+if(!input.value.trim())return;
+
+tasks.unshift({
+id:Date.now(),
+text:input.value,
+priority:priority,
+due:due,
+completed:false,
+created:new Date().toISOString().split("T")[0]
+});
+
+input.value="";
+save();
+render();
+}
+
+function toggleTask(id){
+const task=tasks.find(t=>t.id===id);
+task.completed=!task.completed;
+task.completedDate=new Date().toISOString().split("T")[0];
+save();
+render();
+}
+
+function setFilter(type){
+currentFilter=type;
+document.querySelectorAll(".filter-btn")
+.forEach(btn=>btn.classList.remove("active"));
+event.target.classList.add("active");
+render();
+}
+
+function render(){
+taskList.innerHTML="";
+historyList.innerHTML="";
+
+const today=new Date().toISOString().split("T")[0];
+
+let active=tasks.filter(t=>!t.completed);
+
+if(currentFilter==="today"){
+active=active.filter(t=>t.due===today);
+}
+if(currentFilter==="upcoming"){
+active=active.filter(t=>t.due && t.due>today);
+}
+if(currentFilter==="focus"){
+active=active.filter(t=>t.priority==="high");
+}
+
+/* Render Active */
+active.forEach(task=>{
+taskList.appendChild(createTaskElement(task,false));
+});
+
+/* Render History */
+tasks.filter(t=>t.completed)
+.forEach(task=>{
+historyList.appendChild(createTaskElement(task,true));
+});
+
+updateStats();
+updateHeatmap();
+highlightCurrentTask();
+}
+
+function createTaskElement(task,isHistory){
+const el=document.createElement("div");
+el.className="task-item glass-card p-4 rounded-xl flex justify-between items-center";
+
+el.innerHTML=`
+<div class="flex items-center gap-3">
+${!isHistory?`
+<div onclick="toggleTask(${task.id})"
+class="w-6 h-6 border rounded-full cursor-pointer"></div>
+`:"✔️"}
+<div>
+<p class="${isHistory?'line-through text-slate-500':''}">
+${task.text}
+</p>
+<p class="text-xs text-slate-500">
+${task.due||""}
+</p>
+</div>
+</div>
+<span>${task.priority==="high"?"🔴":task.priority==="medium"?"🟡":"🔵"}</span>
+`;
+
+return el;
+}
+
+/* PRODUCTIVITY */
+function updateStats(){
+const completed=tasks.filter(t=>t.completed).length;
+const total=tasks.length;
+const circumference=314.159;
+const pct=total===0?0:(completed/total)*circumference;
+progressCircle.style.strokeDashoffset=circumference-pct;
+statsLabel.innerText=
+`${completed} of ${total} missions complete`;
+}
+
+/* HEATMAP */
+function updateHeatmap(){
+heatmap.innerHTML="";
+for(let i=0;i<28;i++){
+const dot=document.createElement("div");
+dot.className="h-3 rounded-sm";
+dot.classList.add(Math.random()>.5?
+"bg-[#C1FF72]/40":"bg-slate-800");
+heatmap.appendChild(dot);
+}
+}
+
+function save(){
+localStorage.setItem("trackit_tasks",JSON.stringify(tasks));
+}
+
+render();
+</script>
+
+</body>
+</html>
